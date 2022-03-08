@@ -28,10 +28,8 @@ L'objectif est de développer un algorithme capable d'effectuer de la classifica
 * packages
   * numpy
   * pandas
-  * openpyxl
   * matplotlib
   * scikit-learn
-  * seaborn
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

@@ -1,0 +1,9 @@
+jupyter
+jupyterlab
+matplotlib
+numpy
+pandas
+
+scikit-learn
+scikit-image
+
