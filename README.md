@@ -30,9 +30,11 @@ L'objectif est de développer un algorithme capable d'effectuer de la classifica
   * pandas
   * matplotlib
   * scikit-learn
+  * scikit-image
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
+<!-- Membres -->
 ## Membres
 Honorine Chantre
 Manon Cottart
@@ -42,6 +44,5 @@ Lucas Gonthier
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 ## Ressources
-
 
 <p align="right">(<a href="#top">back to top</a>)</p>
