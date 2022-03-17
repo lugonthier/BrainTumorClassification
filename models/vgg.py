@@ -100,12 +100,11 @@ if __name__ == "__main__":
     ds = loader.load_data('/Users/gonthierlucas/Desktop/repos/data/BrainTumorDataset')
     ds = loader.configure_for_performance(ds, shuffle=True)
 
-
     model = VGG((224, 224, 3))
 
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 
-    vgg= model.build_graph()
+    vgg = model.build_graph()
 
     Xs = []
     ys = []

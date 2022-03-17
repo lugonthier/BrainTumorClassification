@@ -55,20 +55,40 @@ class U_Net(tf.keras.Model):
 
 if __name__ == '__main__':
     import numpy as np
+    from data_loader.loader import DataLoader
+    from sklearn.model_selection import train_test_split
+
     X = np.random.rand(10, 160, 160, 3)
     print(X.shape)
     y = np.random.randint(0, 2, (10, 160, 160, 1))
     y = tf.keras.utils.to_categorical(y, 2)
     print(y)
+
+    dl = DataLoader()
+
+    dataset = dl.load_data("/Users/gonthierlucas/Desktop/repos/data/BrainTumorDataset/Mat_Format_Dataset/",
+                           "mat", height=160, width=160)
+
+    dataset = dataset.map(lambda img, mask, _ : (img, mask))
+    dataset = dl.configure_for_performance(dataset, shuffle=True)
+    Xs = []
+    ys = []
+    for _x, _y in dataset:
+
+        Xs.append(_x)
+        ys.append(_y)
+    X = np.concatenate(Xs, axis=0)
+    y = np.concatenate(ys, axis=0)
+    y = tf.keras.utils.to_categorical(y, 2)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2)
+    print(X_train.shape)
     model = U_Net((160, 160, 3), 2)
 
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 
-    model.compile(optimizer="rmsprop", loss="categorical_crossentropy")
-    callbacks = [
-        tf.keras.callbacks.ModelCheckpoint("test_segmentation.h5", save_best_only=True)
-    ]
+    model.compile(optimizer="rmsprop", loss="categorical_crossentropy", metrics=[tf.keras.metrics.MeanIoU(num_classes=2)])
+
 
     epochs = 5
-    model.fit(X, y, epochs=epochs, batch_size=2, callbacks=callbacks)
+    model.fit(X_train, y_train, epochs=epochs, batch_size=8, validation_data=(X_test, y_test))
