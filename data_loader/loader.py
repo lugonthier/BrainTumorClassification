@@ -2,33 +2,33 @@ import tensorflow as tf
 import pathlib
 import numpy as np
 from data_loader.utils import decode_img
-from pymatreader import read_mat
 import h5py
 
-import cv2
+
 class DataLoader:
 
     def __init__(self):
         pass
 
-    def load_data(self, path, file_type, mask=True,
-                  label=False, height=None, width=None ):
+    def load_data(self, path, file_type, return_mask=True,
+                  return_label=False, height=None, width=None):
         """Loads dataset.
         Arguments:
-           path: Path to dataset.
-           file_type : string `png` and `mat`.
-           mask : boolean to specify if mask should be return.
-           label : boolean to specify if label should be return.
-
+            path: Path to dataset.
+            file_type : string `png` and `mat`.
+            return_mask : boolean to specify if mask should be return.
+            return_label : boolean to specify if label should be return.
+            height : new image height wanted.
+            width : new image width wanted.
         Return : A tensorflow dataset.
         """
 
         data_dir = pathlib.Path(path)
-        input = []
+        inputs = []
         # If we want to resize.
         if (not (height is None)) and (not (height is None)):
-            input.append(tf.cast(height, tf.int32))
-            input.append(tf.cast(width, tf.int32))
+            inputs.append(tf.cast(height, tf.int32))
+            inputs.append(tf.cast(width, tf.int32))
 
         # Test which format is used.
         if file_type == 'png':
@@ -38,6 +38,7 @@ class DataLoader:
         elif file_type == 'mat':
             root = 'brainTumorDataPublic_part'
             folders = [root+'1', root+'2', root+'3', root+'4']
+
             dataset_shape = [tf.float32, tf.float32, tf.int32]
             func = self.process_mat
         else:
@@ -48,7 +49,7 @@ class DataLoader:
         for folder in folders:
             imgs = tf.data.Dataset.list_files(str(data_dir / (folder + '/*')), shuffle=False)
             datasets.append(imgs.map(
-                lambda x: tf.py_function(func=func, inp=[x]+input, Tout=dataset_shape),
+                lambda x: tf.py_function(func=func, inp=[x]+inputs, Tout=dataset_shape),
                 num_parallel_calls=tf.data.AUTOTUNE))
 
         ds = datasets[0].concatenate(datasets[1])
@@ -61,6 +62,7 @@ class DataLoader:
         """
         (height, width) : vgg -> (224, 224), Unet -> (160, 160)
         """
+
         folder = int(tf.strings.split(file_path, '/').numpy()[-2].decode('utf-8'))
         one_hot = np.array([0]*3)
         one_hot[folder-1] += 1
@@ -73,10 +75,8 @@ class DataLoader:
         return tf_img, tf_one_hot_label
 
     def process_mat(self, file_path,  height=None, width=None):
-        if tf.is_tensor(height) and tf.is_tensor(width):
-            height = height.numpy()
-            width = width.numpy()
-        #mat_file = loadmat(file_path.numpy().decode('utf-8'))['cjdata']
+
+
         with h5py.File(file_path.numpy().decode('utf-8'), 'r') as f:
             img = np.array(f.get('cjdata/image')).astype(np.float64)
             mask = np.array(f.get('cjdata/tumorMask'))
@@ -120,16 +120,18 @@ class DataLoader:
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-
     dl = DataLoader()
 
-    dataset = dl.load_data("/Users/gonthierlucas/Desktop/repos/data/BrainTumorDataset/Mat_Format_Dataset",
-                           "mat")
-
-    for X, y,_ in dataset:
-
+    dataset = dl.load_data("/Users/gonthierlucas/Desktop/repos/data/BrainTumorDataset/",
+                           "png")
+    for X, y in dataset:
+        img = X.numpy()
+        hi = np.max(img)
+        lo = np.min(img)
+        img = (((img - lo) / (hi - lo)) * 255).astype(np.uint8)
         print(tf.shape(X))
-        plt.imshow(X.numpy().astype(np.uint8))
+        plt.imshow(img)
         plt.show()
 
         break
+
