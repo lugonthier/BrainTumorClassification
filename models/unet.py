@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.layers import (Input, Conv2D,
                                      BatchNormalization,ReLU)
-from blocks.up_and_down_sampling import DownSamplingBlock, UpSamplingBlock
+from models.blocks.up_and_down_sampling import DownSamplingBlock, UpSamplingBlock
 
 
 class U_Net(tf.keras.Model):
