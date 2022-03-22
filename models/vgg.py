@@ -6,7 +6,7 @@ from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Input
 class VGG(tf.keras.Model):
     """VGG16 model for classification."""
 
-    def __init__(self,input_shape,  n_classes=3, name='VGG', **kwargs):
+    def __init__(self, input_shape,  n_classes=3, name='VGG', **kwargs):
         super(VGG, self).__init__(**kwargs)
 
         self.in_shape = input_shape

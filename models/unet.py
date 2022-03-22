@@ -5,10 +5,10 @@ from tensorflow.keras.layers import (Input, Conv2D,
 from models.blocks.up_and_down_sampling import DownSamplingBlock, UpSamplingBlock
 
 
-class U_Net(tf.keras.Model):
+class UNet(tf.keras.Model):
 
     def __init__(self, input_shape, n_classes, name='U-Net', **kwargs):
-        super(U_Net, self).__init__(**kwargs)
+        super(UNet, self).__init__(**kwargs)
 
         self.in_shape = input_shape
 
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2)
     print(X_train.shape)
     print(X_test.shape)
-    model = U_Net((160, 160, 3), 2)
+    model = UNet((160, 160, 3), 2)
 
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 
