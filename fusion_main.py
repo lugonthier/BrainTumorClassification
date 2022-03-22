@@ -65,10 +65,15 @@ if __name__=="__main__":
     labels = np.concatenate(labels, axis=0)
 
     mask = tf.keras.utils.to_categorical(mask, 2)
-    X_train, X_test, y_train, y_test = train_test_split(X, (mask, labels), test_size=.2)
 
-    mask_train, label_train = y_train
-    mask_test, label_test = y_test
+    indices = np.arange(len(X))
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, indices, test_size=.2)
+
+    mask_train, label_train = mask[y_train], labels[y_train]
+    mask_test, label_test = mask[y_test], labels[y_test]
+
+    assert len(X_train) == len(mask_train)
 
 
     # Begin segmentation
@@ -83,17 +88,25 @@ if __name__=="__main__":
     model.fit(X_train, mask_train, epochs=epochs, batch_size=8, validation_data=(X_test, mask_test))
 
     print("\n\nBegin segmentation prediction\n\n")
-    X_train_pred = model.predict(X_train)
-    X_test_pred = model.predict(X_test)
+    X_train_pred = tf.math.argmax(model.predict(X_train), axis=-1)
+    X_test_pred = tf.math.argmax(model.predict(X_test), axis=-1)
+
+    mask_train = tf.math.argmax(model.predict(mask_train), axis=-1)
+    mask_test = tf.math.argmax(model.predict(mask_test), axis=-1)
+
 
     print(("\n\nBegin process train data \n\n"))
-    ds_train = tf.data.Dataset.from_tensors((X_train_pred, mask_train, label_train))
-    ds_train = ds_train.map(lambda img, mask, label: (get_segmented_part(img, mask), label))
+    print(X_train.shape)
+    assert len(X_train_pred) == len(mask_train)
+    ds_train = tf.data.Dataset.from_tensor_slices((X_train_pred, mask_train, label_train))
+    print(ds_train)
+    ds_train = ds_train.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
     ds_train = ds_train.map(lambda img, label: (tf.py_function(crop_image_padding, [img, 0, 224, 224], [tf.float32]), label))
 
     print(("\n\nBegin process test data \n\n"))
-    ds_test = tf.data.Dataset.from_tensors((X_test_pred, mask_test, label_test))
-    ds_test = ds_test.map(lambda img, mask, label: (get_segmented_part(img, mask), label))
+    assert len(X_test_pred) == len(mask_test)
+    ds_test = tf.data.Dataset.from_tensor_slices((X_test_pred, mask_test, label_test))
+    ds_test = ds_test.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
     ds_test = ds_test.map(lambda img, label: (tf.py_function(crop_image_padding, [img, 0, 224, 224], [tf.float32]), label))
 
     print("\n\nTransform to numpy\n\n")
@@ -101,7 +114,7 @@ if __name__=="__main__":
 
     Xs = []
     ys = []
-    for _x, _y in ds:
+    for _x, _y in ds_train:
 
         Xs.append(tf.squeeze(_x, axis=1))
         ys.append(_y)
@@ -111,7 +124,7 @@ if __name__=="__main__":
     ds_test = dl.configure_for_performance(ds_test, shuffle=True)
     Xs = []
     ys = []
-    for _x, _y in ds:
+    for _x, _y in ds_test:
 
         Xs.append(tf.squeeze(_x, axis=1))
         ys.append(_y)
@@ -129,7 +142,7 @@ if __name__=="__main__":
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2)
     vgg.compile(optimizer=opt, loss=tf.keras.losses.categorical_crossentropy, metrics=['accuracy'])
 
-    vgg.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=8, epochs=10, verbose=1)
+    vgg.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=8, epochs=1, verbose=1)
 
 
 
