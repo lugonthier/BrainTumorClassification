@@ -63,6 +63,10 @@ if __name__=="__main__":
         ys.append(_y)
     X = np.concatenate(Xs, axis=0)
     y = np.concatenate(ys, axis=0)
+    
+    
+    
+    
     # Model
     print(X.shape)
     model = VGG((224, 224, 3))
