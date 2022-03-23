@@ -12,12 +12,12 @@ def get_segmented_part(inputs):
 
     return tf.math.multiply(img, boolean_mask)
 
-class Decoder(tf.keras.layers.Layer):
+class Encoder(tf.keras.layers.Layer):
 
     def __init__(self):
         pass
 
-    def call(self, inputs):
+    def call(self, masks):
 
         #X, y = inputs
         img, mask = tf.map_fn(get_segmented_part, inputs, parallel_iterations=3)
@@ -27,25 +27,53 @@ class Decoder(tf.keras.layers.Layer):
 
 class Classifier(tf.keras.Model):
 
-    def __init__(self, input_shape, segmentor, classifier, decoder, name='Segment_Based_Classifier', **kwargs):
+    def __init__(self, input_shape, segmentor, classifier, encoder, name='Segment_Based_Classifier', **kwargs):
         super(Classifier, self).__init__(**kwargs)
 
-        inputs = tf.keras.Input(shape=[input_shape])
-        x = segmentor(inputs)
-        x = decoder(x)
-        outputs = classifier(x)
+        self.segmentor = segmentor
+        self.classifier = classifier
+        self.encoder
 
-        self.model = tf.keras.Model(inputs, outputs)
+    def compile(self, optimizers, losses, metrics):
+        # Compile segmentor module
+        self.segmentor.compile(loss=losses[0],
+                           optimizer=optimizer[0], metrics=metrics[0])
 
-    def compile(self, optimizer, losses):
-        self.model.compile(loss=losses,
-                           optimizer=optimizer, metrics=["accuracy"])
+        # Compile classifier module
+        self.classifier.compile(loss=losses[1],
+                           optimizer=optimizer[1], metrics=metrics[1])
 
-    def fit(self, X, Y, epochs, batch):
-        return self.model.fit(X, Y, epochs=epochs, batch_size=batch, validation_split=0.1)
+    def fit(self, inputs, end_to_end=False):
+        imgs, masks, labels = inputs
 
-    def evaluate(self, X, Y):
-        return self.model.evaluate(X, Y)
+        self.segmentor.fit(imgs, masks)
+
+        if (end_to_end):
+            masks = self.segmentor.predict(imgs)
+        
+        # Encode masks 
+        # Roi augmentation
+
+        self.classifier.fit(masks, labels)
+        
+
+    def evaluate(self, inputs):
+        imgs, masks, labels = inputs
+
+        masks = self.segmentor.predict(imgs)
+
+        # Encode masks
+        # Roi augmentation
+
+        self.classifier.evaluate(masks, labels)
+
+        
 
     def predict(self, X):
-        return self.model.predict(X)
+        
+        masks = self.segmentor.predict(X)
+
+        # encode masks
+        # Roi augmentation
+
+        return self.classifier.predict(masks)
