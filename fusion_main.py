@@ -11,37 +11,62 @@ def get_segmented_part(img, mask):
 
     return tf.math.multiply(img, boolean_mask)
 
+def extract_roi_from_img(image, tol=0, height=None, width=None):
+    """ Extract non zeros part of an image.
+    Used to crop an image to get only the region of interest.
+    """
 
-def crop_image_padding(image, tol=0, height=None, width=None):
-    # img is 3D image data with transparency channel
-    # tol is tolerance (0 in your case)
-    # we are interested only in the transparency layer so:
-  
-    image = image.numpy()
-    tol = tol.numpy()
-    channels = []
-    for ind in range(3):
+    tol = tf.cast(tol,tf.float32)
+    shape = tf.shape(image)
+    m, n = shape[0], shape[1]
+
+    channels = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+
+    min_col_start = n
+    max_col_end = 0
+    min_row_start = m
+    max_row_end = 0
+    # For each channel
+    for ind in tf.range(tf.shape(image)[-1]):
+        # Because python lists not work well with TF control flow.
+        # Cf: https://github.com/tensorflow/tensorflow/issues/37512
+
+        img = image[:,:,ind]
+
+        # Get the mask based on tol value.
+        mask = tf.cast(tf.greater(img, tf.fill(tf.shape(img), tol)), tf.float32)
+
+        mask0, mask1 = tf.experimental.numpy.any(mask, 0), tf.experimental.numpy.any(mask, 1)
+        
+        # Get indices to crop the image.
+        col_start, col_end = tf.argmax(mask0, output_type=tf.int32), tf.cast(n, tf.int32) - tf.argmax(mask0[::-1], output_type=tf.int32)
+        row_start, row_end = tf.argmax(mask1, output_type=tf.int32), tf.cast(m, tf.int32) - tf.argmax(mask1[::-1], output_type=tf.int32)
+    
+        if col_start < min_col_start:
+          min_col_start = col_start
+        if col_end > max_col_end:
+          max_col_end = col_end
+        if row_start < min_row_start:
+          min_row_start = row_start
+        if row_end > max_row_end:
+          max_row_end = row_end
+        
+    for ind in tf.range(tf.shape(image)[-1]):
       img = image[:,:,ind]
-      mask = img > tol
-      shape = img.shape
-      m, n = shape[0], shape[1]
-      mask0, mask1 = mask.any(0), mask.any(1)
-      col_start,col_end = mask0.argmax(),n-mask0[::-1].argmax()
-      row_start,row_end = mask1.argmax(),m-mask1[::-1].argmax()
-      
-      new = tf.cast(img[row_start:row_end, col_start:col_end], tf.int32)
-      
-      channels.append(tf.cast(new, tf.int32))
+      new = img[min_row_start:max_row_end, min_col_start:max_col_end]
+          
+      channels = channels.write(channels.size(), new)
+        
 
-    channels = tf.transpose(channels, [1, 2, 0])
+    # Reshape with channels at the end.
+    channels = channels.stack()
+    shape = tf.shape(channels)
+    new_image = tf.reshape(channels, [shape[1], shape[2], shape[0]])
+ 
     if (height is not None) and (width is not None):
-        new_image = tf.image.resize(channels, [height, width])
-    else:
-      tf.cast(channels, tf.int32)
-
-   
+        new_image = tf.image.resize(new_image, [height, width])
+    
     return new_image
-
 if __name__=="__main__":
 
     # Loading data
@@ -61,7 +86,7 @@ if __name__=="__main__":
         labels.append(label)
 
     X = np.concatenate(Xs, axis=0)
-    print(X.shape)
+    
     mask = np.concatenate(masks, axis=0)
     labels = np.concatenate(labels, axis=0)
 
@@ -85,7 +110,7 @@ if __name__=="__main__":
 
     model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=[tf.keras.metrics.MeanIoU(num_classes=2), tf.keras.metrics.AUC(), tf.keras.metrics.Recall()])
 
-    epochs = 1
+    epochs = 12
     model.fit(X_train, mask_train, epochs=epochs, batch_size=8, validation_data=(X_test, mask_test))
 
     print("\n\nBegin segmentation prediction\n\n")
@@ -102,13 +127,13 @@ if __name__=="__main__":
     ds_train = tf.data.Dataset.from_tensor_slices((X_train, mask_train, label_train))
     print(ds_train)
     ds_train = ds_train.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
-    ds_train = ds_train.map(lambda img, label: (tf.py_function(crop_image_padding, [img, 0, 224, 224], [tf.float32]), label))
+    ds_train = ds_train.map(lambda img, label: (extract_roi_from_img(img, 0, 224, 224), label))
 
     print(("\n\nBegin process test data \n\n"))
     assert len(X_test) == len(mask_test_pred)
     ds_test = tf.data.Dataset.from_tensor_slices((X_test, mask_test_pred, label_test))
     ds_test = ds_test.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
-    ds_test = ds_test.map(lambda img, label: (tf.py_function(crop_image_padding, [img, 0, 224, 224], [tf.float32]), label))
+    ds_test = ds_test.map(lambda img, label: (extract_roi_from_img(img, 0, 224, 224), label))
 
     print("\n\nTransform to numpy\n\n")
     ds_train = dl.configure_for_performance(ds_train, shuffle=True)
@@ -116,8 +141,8 @@ if __name__=="__main__":
     Xs = []
     ys = []
     for _x, _y in ds_train:
-
-        Xs.append(tf.squeeze(_x, axis=1))
+     
+        Xs.append(_x)
         ys.append(_y)
     X_train = np.concatenate(Xs, axis=0)
     y_train = np.concatenate(ys, axis=0)
@@ -127,7 +152,7 @@ if __name__=="__main__":
     ys = []
     for _x, _y in ds_test:
 
-        Xs.append(tf.squeeze(_x, axis=1))
+        Xs.append(_x)
         ys.append(_y)
     X_test = np.concatenate(Xs, axis=0)
     y_test = np.concatenate(ys, axis=0)
@@ -143,7 +168,7 @@ if __name__=="__main__":
     
     vgg.compile(optimizer=opt, loss=tf.keras.losses.categorical_crossentropy, metrics=['accuracy'])
 
-    vgg.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=8, epochs=1, verbose=1)
+    vgg.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=8, epochs=12, verbose=1)
 
 
 
