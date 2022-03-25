@@ -1,4 +1,20 @@
 import tensorflow as tf
+
+
+def configure_for_performance(dataset, shuffle: bool = False, batch_size: int =32,
+                                  buffer_size: int = 1000):
+        """
+        Configure dataset for performance.
+        https://www.tensorflow.org/guide/performance/datasets
+        """
+        dataset = dataset.cache()
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size=buffer_size)
+        dataset = dataset.batch(batch_size)
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
+        return dataset
+
 def decode_img(img, format=None, img_height: int = None, img_width: int = None):
     # Convert the compressed string to a 3D uint8 tensor
     if tf.is_tensor(img_height) and tf.is_tensor(img_width):

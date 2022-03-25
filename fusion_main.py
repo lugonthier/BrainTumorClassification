@@ -125,7 +125,7 @@ if __name__=="__main__":
 
     assert len(X_train) == len(mask_train_pred)
     ds_train = tf.data.Dataset.from_tensor_slices((X_train, mask_train, label_train))
-    print(ds_train)
+    print(ds_train) 
     ds_train = ds_train.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
     ds_train = ds_train.map(lambda img, label: (extract_roi_from_img(img, 0, 224, 224), label))
 
