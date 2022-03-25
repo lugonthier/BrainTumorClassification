@@ -54,7 +54,8 @@ if __name__=="__main__":
     opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
     model.compile(optimizers=["rmsprop", "rmsprop"], losses=["binary_crossentropy", "categorical_crossentropy"], metrics=[[tf.keras.metrics.MeanIoU(num_classes=2)], ["accuracy"]])
+    model.fit(train_inputs=[X_train, mask_train, label_train], valid_inputs=[X_test, mask_test, label_test], end_to_end=True)
 
-    model.fit(train_inputs=[X_train, mask_train, label_train], valid_inputs=[X_test, mask_test, label_test])
-
-
+    x = np.expand_dims(X_test[0], axis=0)
+    prediction = model.predict(x, True)
+    print(prediction)

@@ -77,7 +77,7 @@ class Classifier(tf.keras.Model):
 
     def evaluate(self, inputs):
         
-        
+         
 
         masks = self.segmentor.predict(imgs)
 
@@ -88,14 +88,20 @@ class Classifier(tf.keras.Model):
 
         
 
-    def predict(self, img):
+    def predict(self, img, return_mask=False):
         
-        masks = self.segmentor.predict(img)
-
+        mask_pred = tf.expand_dims(tf.math.argmax(self.segmentor.predict(img), axis=-1), axis=-1)
+        img_seg = get_segmented_part(tf.cast(img, tf.float32), mask_pred)
         
-        # Roi augmentation
 
-        return self.classifier.predict(masks)
+        roi = tf.expand_dims(extract_roi_from_img(img_seg[0], 0, self.classifier_input_shape, self.classifier_input_shape), axis=0)
+        
+        label_pred = self.classifier.predict(roi)
+
+        if return_mask:
+            return (mask_pred, label_pred)
+
+        return label_pred
 
 
 if __name__=="__main__":
