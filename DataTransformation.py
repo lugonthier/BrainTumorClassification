@@ -581,6 +581,14 @@ class DataSeparator:
             print('Sauvegarde des donnees d\'entrainement de la classe ' + str(c))
             save_data(self.mat_train[c], 'dataset/train')
 
+    def save_train_to_file_system(self):
+        """
+        Sauvegarde les donnees d'entrainement dans le systeme de fichiers
+        """
+        for c in range(len(self.mat_train)):
+            print('Sauvegarde des donnees d\'entrainement de la classe ' + str(c))
+            save_data(self.mat_train[c], 'dataset/Train-non-augmente')
+
 class Transformation:
     def __init__(self, transformation_function, parameters=None, display=False):
         """
@@ -610,9 +618,9 @@ class Transformation:
                 print('100% complete')
 
             if self.parameters == None:
-                transformed_data[key + '_aug_' + self.get_code()] = self.transformation_function(value)
+                transformed_data[key + '_' + self.get_code()] = self.transformation_function(value)
             else:
-                transformed_data[key + '_aug_' + self.get_code()] = self.transformation_function(value, self.parameters)
+                transformed_data[key + '_' + self.get_code()] = self.transformation_function(value, self.parameters)
             count = count + 1
         
         return transformed_data
@@ -630,9 +638,20 @@ class Transformation:
         """
         Retourne le code de la transformation
         """
-        if self.parameters == None:
-            return self.transformation_function.__name__[0:6]
-        else:
-            return self.transformation_function.__name__[0:6] + '_' + str(self.parameters)
+
+        if self.transformation_function.__name__ == 'flip_horizontal':
+            return 'fh'
+        if self.transformation_function.__name__ == 'flip_vertical':
+            return 'fv'
+        if self.transformation_function.__name__ == 'rotate_90':
+            return 'r90'
+        if self.transformation_function.__name__ == 'gaussian_blur':
+            return 'gb'
+        
+        # if self.parameters == None:
+        #     return self.transformation_function.__name__[0:6]
+        # else:
+        #     return self.transformation_function.__name__[0:6] + '_' + str(self.parameters)
+        return 'unknown'
     
     
