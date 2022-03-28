@@ -13,11 +13,11 @@ import random
 from scipy.ndimage import gaussian_filter
 
 def load_data(type, nb_images=3064):
-    data =  []
+    data =  {}
     if type == 'mat':
         for i in range(nb_images):
             dir = "dataset/Mat_Format_Dataset/" + str(i+1) + ".mat"
-            data.append(read_mat(dir))
+            data[str(i+1)] = read_mat(dir)
         return data
     
     if type == 'png':
@@ -39,7 +39,7 @@ def make_couple(data):
         couples.append([data[2*i], data[2*i + 1]])
     return couples
 
-def flip_horizontal(mat, display=False):
+def flip_horizontal(mat, parameter=None, display=False):
     """
     Flip horizontal d'une seule image (top to bottom)
     input : 
@@ -97,7 +97,7 @@ def flip_horizontal(mat, display=False):
     
     return flipped_mat
 
-def flip_vertical(mat, display=False):
+def flip_vertical(mat, parameter=None, display=False):
     """
     Flip vertical d'une seule image (top to bottom)
     input : 
@@ -223,7 +223,7 @@ def rotate_90(mat, n=1, display=False):
     
     return r_mat
 
-def gaussian_blur(mat, sigma=[2, 0.8, 0.5], display=False):
+def gaussian_blur(mat, sigma=[2, 0, 0], display=False):
     """
     Application d'un filtre gaussien sur une seule image 
     input : 
@@ -281,40 +281,43 @@ def gaussian_blur(mat, sigma=[2, 0.8, 0.5], display=False):
 def classify_data(mat_data):
     """
     input:
-        - mat_data : dictionnaire de donnees a separer
+        - mat_data : dictionnaire de donnees a separer {}
     ouput:
-        - classified_lists: : listes classees selon le type de tumeur [ [], [], [] ]
+        - classified_lists: : listes de dictionnaire separes selon le type de tumeur [ {}, {}, {} ]
     """
-    meningioma = []
-    glioma = []
-    pituitary = []
+    meningioma = {}
+    glioma = {}
+    pituitary = {}
     classified_lists = [meningioma, glioma, pituitary]
 
-    for mat in mat_data:
-        class_index = int(mat['cjdata']['label'] - 1)
-        classified_lists[class_index].append(mat)
+    for key, value in mat_data.items():
+        class_index = int(value['cjdata']['label'] - 1)
+        classified_lists[class_index][key] = value
     
     return classified_lists
 
 def random_sampling(mat_data, n):
     """
     input:
-        - mat_data : liste de donnees a echantillonner [ ]
+        - mat_data : dictionnaire de donnees a echantillonner {}
         - n : nombre de donnees a echantillonner
     output:
-        - liste contenant les donnees echantillonnees
+        - dictionnaire contenant les donnees echantillonnees
     """
     # On remplit le dictionnaire 
-    sampling = []
+    sampling = {}
     while len(sampling) < n:
-        i = random.randrange(0, len(mat_data))
-        sampling.append(mat_data.pop(i))
+        random_key = random.choice(list(mat_data))
+        # On ajoute la clee aleatoire au dictionnaire de sampling
+        sampling[random_key] = copy.deepcopy(mat_data[random_key])
+        # On retire la clee aleatoire du dictionnaire original
+        del mat_data[random_key]
     return sampling
 
 def separate_train_test_val(mat_data, p_train=0.8, p_test=0.1, p_val=0.1, save=False):
     """
     input:
-        - mat_data : liste de donnees a separer [ [], [], [] ]
+        - mat_data : liste de donnees a separer [ {}, {}, {} ]
         - p_train : pourcentage de donnees en train
         - p_test : pourcentage de donnees en test
         - p_val : pourcentage de donnees en validation
@@ -329,35 +332,52 @@ def separate_train_test_val(mat_data, p_train=0.8, p_test=0.1, p_val=0.1, save=F
     N_test = int(p_test * N)
     N_val = int(p_val * N)
     
-    mat_test = []
-    mat_val = []
+    mat_test = [{}, {}, {}]
+    mat_val = [{}, {}, {}]
     for i in range(n_class):
-        mat_test = mat_test + random_sampling(mat_data[i], int(N_test/n_class))
-        mat_val = mat_val + random_sampling(mat_data[i], int(N_val/n_class))
-    
+        mat_test[i] = random_sampling(mat_data[i], int(N_test/n_class))
+        mat_val[i] = random_sampling(mat_data[i], int(N_val/n_class))
     # remainder goes to train
-    mat_train = []
-    for i in range(n_class):
-        while len(mat_data[i]) > 0:
-            mat_train.append(mat_data[i].pop(0))
+    mat_train = mat_data
+    # for i in range(n_class):
+    #     while len(mat_data[i]) > 0:
+    #         mat_train.append(mat_data[i].pop(0))
     
     # sanity check
-    if  len(mat_train) < (N_train - 2*n_class)  \
-        or len(mat_test) < (N_test - 2*n_class) \
-        or len(mat_val) < (N_val - 2*n_class) :
+    # if  len(mat_train) < (N_train - 2*n_class)  \
+    #     or len(mat_test) < (N_test - 2*n_class) \
+    #     or len(mat_val) < (N_val - 2*n_class) :
+    #     print('Something went wrong')
+    #     print('N', N)
+    #     print('N_test', N_test)
+    #     print('len(mat_test)', len(mat_test))
+    #     print('N_val', N_val)
+    #     print('len(mat_val)', len(mat_val))
+    #     print('N_train', N_train)
+    #     print('len(mat_train)', len(mat_train))
+        # return
+    # sanity check
+    if abs(len(mat_test[0]) + len(mat_test[1]) + len(mat_test[2]) - N_test) > 1 :
         print('Something went wrong')
-        print('N', N)
         print('N_test', N_test)
-        print('len(mat_test)', len(mat_test))
+        print('len(mat_test)', len(mat_test[0]) + len(mat_test[1]) + len(mat_test[2]))
+        return
+    
+    if abs(len(mat_val[0]) + len(mat_val[1]) + len(mat_val[2]) - N_val) > 1 :
+        print('Something went wrong')
         print('N_val', N_val)
-        print('len(mat_val)', len(mat_val))
+        print('len(mat_val)', len(mat_val[0]) + len(mat_val[1]) + len(mat_val[2]))
+        return
+
+    if  abs(len(mat_train[0]) + len(mat_train[1]) + len(mat_train[2]) - N_train) > 1 :
+        print('Something went wrong')
         print('N_train', N_train)
-        print('len(mat_train)', len(mat_train))
-        
+        print('len(mat_train)', len(mat_train[0]) + len(mat_train[1]) + len(mat_train[2]))
         return
     
     if save:
-        save_data(mat_train, 'dataset/Train')
+        # Train must me equally distributed among classes before saving
+        # save_data(mat_train, 'dataset/Train')
         save_data(mat_test, 'dataset/Test')
         save_data(mat_val, 'dataset/Validation')
     
@@ -366,7 +386,7 @@ def separate_train_test_val(mat_data, p_train=0.8, p_test=0.1, p_val=0.1, save=F
 def save_data(mat_data, dir_name):
     """
     input:
-        - mat_data : liste de donnees a sauvegarder []
+        - mat_data : liste de donnees a sauvegarder {}
         - dir_name : dossier ou les donnees seront sauvegardees
     output:
         - aucun, mais les donnees sont sauvegardes dans les dossiers respectifs (Test, Train, Validation)
@@ -374,23 +394,24 @@ def save_data(mat_data, dir_name):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
-    if not len(os.listdir('/your/path')) == 0:
-        print("Directory is not empty")
-        return
+    if not len(os.listdir(dir_name)) == 0:
+        print("WARNING: Directory is not empty")
+        # return
 
     n_data = len(mat_data)
-    for index, mat in enumerate(mat_data):
-        if abs(index - n_data/4) < 1:
+    count = 0
+    for index, value in mat_data.items():
+        if count == int(n_data/4):
             print('25% complete')
-        if abs(index - n_data/2) < 1:
+        if count == int(n_data/2) < 1:
             print('50% complete')
-        if abs(index - 3*n_data/4) < 1:
+        if count == 3*n_data/4:
             print('75% complete')
+        if count == (n_data - 1):
+            print('100% complete')
         
         file_name = dir_name + '/' + str(index) + '.mat'
-        savemat(file_name, mat)
-
-    print('100% complete')
+        savemat(file_name, value)
 
 def generate_flip_horizontal(mat_data):
     print('Flip horizontal de donnees')
@@ -454,3 +475,164 @@ def generate_gaussian(mat_data):
         fileName = "dataset/" + transformation + "/"  + str(key) + ".mat"
         savemat(fileName, gaussian_blur(value))
     print('100% complete')
+
+class DataSeparator:
+
+    def __init__(self, mat_data, equalizing_transformations , p_train=0.8, p_test=0.1, p_val=0.1):
+        """
+        - mat_data : liste de donnees a separer [{}, {}, {}], divisees en classes
+        - equalizing_transformations : liste des combinaisons de transformations a appliquer [Transformation1, Transformation2, ... , TransformationN]
+        - p_train : pourcentage de donnees a separer en train
+        - p_test : pourcentage de donnees a separer en test
+        - p_val : pourcentage de donnees a separer en validation
+        """
+        self.mat_data = mat_data
+        self.mat_val = [{}, {}, {}]
+        self.mat_test = [{}, {}, {}]
+        self.mat_train = [{}, {}, {}]
+        self.equalizing_transformations = equalizing_transformations
+        self.N = len(mat_data[0]) + len(mat_data[1]) + len(mat_data[2])
+        self.p_train = p_train
+        self.p_test = p_test
+        self.p_val = p_val
+        self.n_train = int(self.N * p_train)
+        self.n_test = int(self.N * p_test)
+        self.n_val = int(self.N * p_val)
+
+    def separate_data(self, save=False):
+        """
+        - separe les donnees en train, test et validation
+        - les donnees seront separees en 3 ensembles :
+            - train
+            - test
+            - validation
+        """
+        # Separation des donnees en train, test et validation
+        self.mat_train, self.mat_test, self.mat_val = separate_train_test_val(self.mat_data, self.p_train, self.p_test, self.p_val, save)
+    
+    def equalize_train(self):
+        """
+        Augmente les donnees d'entrainement jusqu'a ce que chaque classe soit egalement representee dans le train
+        """
+        # nombre de donnees supplementaires requises pour chaque classe
+        n_par_classe = [len(self.mat_train[0]), len(self.mat_train[1]), len(self.mat_train[2])]
+        print('n_par_classe: ', n_par_classe)
+        n_max = max(n_par_classe)
+        n_requis = [n_max - n_par_classe[0], n_max - n_par_classe[1], n_max - n_par_classe[2]]
+        print('n_requis: ', n_requis)
+
+        # Validation pre egalisation
+        if n_par_classe[0] * len(self.equalizing_transformations) < n_max:
+            print('Impossible d\'augmenter les donnees d\'entrainement')
+            print('n_classe_1 *  len(self.equalizing_transformations) = ' + str(n_par_classe[0] * len(self.equalizing_transformations)))
+            print('n_max = ' + str(n_max))
+
+        if n_par_classe[1] * len(self.equalizing_transformations) < n_max:
+            print('Impossible d\'augmenter les donnees d\'entrainement')
+            print('n_classe_1 *  len(self.equalizing_transformations) = ' + str(n_par_classe[1] * len(self.equalizing_transformations)))
+            print('n_max = ' + str(n_max))
+        
+        if n_par_classe[2] * len(self.equalizing_transformations) < n_max:
+            print('Impossible d\'augmenter les donnees d\'entrainement')
+            print('n_classe_2 *  len(self.equalizing_transformations) = ' + str(n_par_classe[2] * len(self.equalizing_transformations)))
+            print('n_max = ' + str(n_max))
+
+        # Augmentation des donnees d'entrainement
+        # iteration sur chaque classe
+        for c in range(len(self.mat_train)):
+            if n_requis[c] > 0:
+                print('Augmentation des donnees d\'entrainement de la classe ' + str(c))
+                keys = list(self.mat_train[c])
+                for i in range(n_requis[c]):
+                    if i == int(n_requis[c] / 4):
+                        print('25% complete')
+                    if i == int(n_requis[c] / 2):
+                        print('50% complete')
+                    if i == int(n_requis[c] * 3 / 4):
+                        print('75% complete')
+                    if i == (n_requis[c] - 1):
+                        print('100% complete')
+                    key = keys[i % len(keys)]
+                    value = self.mat_train[c][key]
+                    transformation = self.equalizing_transformations[int(i / n_par_classe[c])]
+                    self.mat_train[c][key + '_eq_' + transformation.get_code()] = transformation.apply_one_transformation(value)
+            else:
+                print('Les donnees de la classe ' + str(c) + ' sont suffisantes')
+
+    def augment_train(self, transformation):
+        """
+        Augmente les donnees d'entrainement
+        - transformation : transformation a appliquer (type : Transformation)
+        """
+        for c in range(len(self.mat_train)):
+            print('Augmentation des donnees d\'entrainement de la classe ' + str(c))
+            print('Transformation: ' + transformation.get_code())
+            self.mat_train[c].update(transformation.apply_transformation(self.mat_train[c]))
+
+    def save_to_file_system(self):
+        """
+        Sauvegarde les donnees dans le systeme de fichiers
+        """
+        for c in range(len(self.mat_train)):
+            print('Sauvegarde des donnees de validation de la classe ' + str(c))
+            save_data(self.mat_val[c], 'dataset/Validation')
+            print('Sauvegarde des donnees de test de la classe ' + str(c))
+            save_data(self.mat_test[c], 'dataset/Test')
+            print('Sauvegarde des donnees d\'entrainement de la classe ' + str(c))
+            save_data(self.mat_train[c], 'dataset/train')
+
+class Transformation:
+    def __init__(self, transformation_function, parameters=None, display=False):
+        """
+        - transformation_function : fonction de transformation
+        - parameters : liste des parametres de la transformation
+        - display : boolean, True si on veut afficher les transformations
+        """
+        self.transformation_function = transformation_function
+        self.parameters = parameters
+        self.display = display
+    
+    def apply_transformation(self, mat_data):
+        """
+        Applique la transformation sur les donnees
+        - mat_data : dictionnaire de donnees a transformer
+        """
+        transformed_data = {}
+        count = 0
+        for key, value in mat_data.items():        
+            if count == int(len(mat_data) / 4):
+                print('25% complete')
+            if count == int(len(mat_data) / 2):
+                print('50% complete')
+            if count == int(len(mat_data) * 3 / 4):
+                print('75% complete')
+            if count == (len(mat_data) - 1):
+                print('100% complete')
+
+            if self.parameters == None:
+                transformed_data[key + '_aug_' + self.get_code()] = self.transformation_function(value)
+            else:
+                transformed_data[key + '_aug_' + self.get_code()] = self.transformation_function(value, self.parameters)
+            count = count + 1
+        
+        return transformed_data
+
+    def apply_one_transformation(self, mat_data):
+        """
+        Applique la transformation sur une seule donnee
+        """
+        if self.parameters == None:
+            return self.transformation_function(mat_data)
+        else:
+            return self.transformation_function(mat_data, self.parameters)
+
+    def get_code(self):
+        """
+        Retourne le code de la transformation
+        """
+        if self.parameters == None:
+            return self.transformation_function.__name__[0:6]
+        else:
+            return self.transformation_function.__name__[0:6] + '_' + str(self.parameters)
+    
+    

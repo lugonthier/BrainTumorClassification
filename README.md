@@ -31,6 +31,7 @@ L'objectif est de développer un algorithme capable d'effectuer de la classifica
   * matplotlib
   * scikit-learn
   * scikit-image
+  * pymatreader
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
