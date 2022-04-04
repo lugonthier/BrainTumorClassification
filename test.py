@@ -5,9 +5,9 @@ from models.unet import UNet
 from models.vgg import VGG
 from models.classifier import Classifier
 from sklearn.model_selection import train_test_split
+from ops.transition import roi_mask_augmentation
 
-
-
+roi_augmentation = True
 if __name__=="__main__":
     # Loading data
     print("Loading data\n\n")
@@ -29,7 +29,7 @@ if __name__=="__main__":
     mask = np.concatenate(masks, axis=0)
     labels = np.concatenate(labels, axis=0)
 
-    mask = tf.keras.utils.to_categorical(mask, 2)
+    #mask = tf.keras.utils.to_categorical(mask, 2)
 
     indices = np.arange(len(X))
     
@@ -38,6 +38,12 @@ if __name__=="__main__":
     mask_train, label_train = mask[y_train], labels[y_train]
     mask_test, label_test = mask[y_test], labels[y_test]
 
+
+    if roi_augmentation:
+        mask_train = [roi_mask_augmentation(mask[:, :, 0]) for mask in mask_train]
+
+    mask_train = tf.keras.utils.to_categorical(mask_train, 2)
+    mask_test = tf.keras.utils.to_categorical(mask_test, 2)
     assert len(X_train) == len(mask_train)
 
 
@@ -58,4 +64,3 @@ if __name__=="__main__":
 
     x = np.expand_dims(X_test[0], axis=0)
     prediction = model.predict(x, True)
-    print(prediction)

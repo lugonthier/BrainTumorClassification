@@ -3,19 +3,7 @@ from models.unet import UNet
 from models.vgg import VGG
 from tensorflow.keras.models import Sequential
 from data_loader.utils import configure_for_performance
-from ops.transition import get_segmented_part, extract_roi_from_img, get_tensor_from_dataset
-
-class Encoder(tf.keras.layers.Layer):
-
-    def __init__(self):
-        pass
-
-    def call(self, masks):
-
-        #X, y = inputs
-        img, mask = tf.map_fn(get_segmented_part, inputs, parallel_iterations=3)
-
-
+from ops.transition import get_segmented_part, extract_roi_from_img, get_tensor_from_dataset, roi_mask_augmentation
 
 
 class Classifier(tf.keras.Model):
@@ -38,14 +26,14 @@ class Classifier(tf.keras.Model):
                            optimizer=optimizers[1], metrics=metrics[1])
 
 
-    def fit(self, train_inputs, valid_inputs, epochs=[1, 1], batch_size=[8, 8], end_to_end=False):
+    def fit(self, train_inputs, valid_inputs, epochs=[1, 1], batch_size=[8, 8], roi_augmentation=False, end_to_end=False):
        
         train_img, train_mask, train_label = train_inputs
         valid_img, valid_mask, valid_label = valid_inputs
         
         self.segmentor.fit(train_img, train_mask, epochs=epochs[0], batch_size=batch_size[0], validation_data=(valid_img, valid_mask))
 
-        if (end_to_end):
+        if end_to_end:
             
             train_mask = tf.expand_dims(tf.math.argmax(self.segmentor.predict(train_img), axis=-1), axis=-1)
 
@@ -53,14 +41,20 @@ class Classifier(tf.keras.Model):
         valid_mask_pred = tf.expand_dims(tf.math.argmax(self.segmentor.predict(valid_img), axis=-1), axis=-1)
         train_mask = tf.expand_dims(tf.math.argmax(train_mask, axis=-1), axis=-1)
         valid_mask = tf.math.argmax(valid_mask, axis=-1)
-        
+
         ds_train = tf.data.Dataset.from_tensor_slices((train_img, train_mask, train_label))
         ds_valid = tf.data.Dataset.from_tensor_slices((valid_img, valid_mask_pred, valid_label))
+
+         # ROI augmentation
+        if roi_augmentation:
+            ds_train = ds_train.map(lambda img, mask, label: (img, tf.py_function(roi_mask_augmentation, mask, Tout=tf.float32), label))
+            ds_valid = ds_valid.map(lambda img, mask, label: (img, tf.py_function(roi_mask_augmentation, mask, Tout=tf.float32), label))
+        
 
         # Get segmented part from img.
         ds_train = ds_train.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
         ds_valid = ds_valid.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
-
+            
         # Extract ROI from img and resize it.
         ds_train = ds_train.map(lambda img, label: (extract_roi_from_img(img, 0, self.classifier_input_shape, self.classifier_input_shape), label))
         ds_valid = ds_valid.map(lambda img, label: (extract_roi_from_img(img, 0, self.classifier_input_shape, self.classifier_input_shape), label))
@@ -70,7 +64,10 @@ class Classifier(tf.keras.Model):
         train_img, train_label = get_tensor_from_dataset(ds_train)
         valid_img, valid_label = get_tensor_from_dataset(ds_valid)
         
-        # TODO: Roi augmentation
+        
+        
+
+            
 
         self.classifier.fit(train_img, train_label, epochs=epochs[1], batch_size=batch_size[0], validation_data=(valid_img, valid_label))
         

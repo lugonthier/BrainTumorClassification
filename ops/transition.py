@@ -1,8 +1,11 @@
 import numpy as np
 import tensorflow as tf
 
+from scipy import ndimage
 
 def get_tensor_from_dataset(dataset):
+    """From a tensorflow dataset, return a list of tensor.
+    """
 
     Xs = []
     ys = []
@@ -11,11 +14,29 @@ def get_tensor_from_dataset(dataset):
         ys.append(y)
     return np.concatenate(Xs, axis=0), np.concatenate(ys, axis=0)
 
+
 def get_segmented_part(img, mask):
+    """From the image conserve only part corresponding to the ROI. The rest will be set to 0.
+    """
     zeros = tf.zeros_like(mask)
     boolean_mask = tf.cast(tf.math.not_equal(mask, zeros), tf.float32)
 
     return tf.math.multiply(img, boolean_mask)
+
+
+def roi_mask_augmentation(mask, h=40, w=40, center=None, radius=None):
+    
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    circular_mask = dist_from_center <= radius
+    return ndimage.binary_dilation(mask, circular_mask)
+
 
 def extract_roi_from_img(image, tol=0, height=None, width=None):
     """ Extract non zeros part of an image.
@@ -62,7 +83,6 @@ def extract_roi_from_img(image, tol=0, height=None, width=None):
       new = img[min_row_start:max_row_end, min_col_start:max_col_end]
           
       channels = channels.write(channels.size(), new)
-        
 
     # Reshape with channels at the end.
     channels = channels.stack()
