@@ -3,9 +3,7 @@ jupyterlab
 matplotlib
 numpy
 pandas
+
 scikit-learn
 scikit-image
-pymatreader
-tensorflow
-pathlib
-h5py
+
