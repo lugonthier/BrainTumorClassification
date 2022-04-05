@@ -16,7 +16,7 @@ def load_data(type, nb_images=3064):
     data =  {}
     if type == 'mat':
         for i in range(nb_images):
-            dir = "dataset/Mat_Format_Dataset/" + str(i+1) + ".mat"
+            dir = "BrainTumorDataset/Mat_Format_Dataset/" + str(i+1) + ".mat"
             data[str(i+1)] = read_mat(dir)
         return data
     
