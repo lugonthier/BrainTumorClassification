@@ -2,7 +2,7 @@ import tensorflow as tf
 import pathlib
 import numpy as np
 from data_loader.utils import decode_img
-import h5py
+from pymatreader import read_mat
 
 
 class DataLoader:
@@ -32,12 +32,12 @@ class DataLoader:
 
         # Test which format is used.
         if file_type == 'png':
-            folders = ['1', '2', '3']
+            folders = ['1/*', '2/*', '3/*']
             dataset_shape = [tf.float32, tf.int32]
             func = self.process_png
+
         elif file_type == 'mat':
-            root = 'brainTumorDataPublic_part'
-            folders = [root+'1', root+'2', root+'3', root+'4']
+            folders = ['*']
 
             dataset_shape = [tf.float32, tf.float32, tf.int32]
             func = self.process_mat
@@ -47,13 +47,16 @@ class DataLoader:
 
         datasets = []
         for folder in folders:
-            imgs = tf.data.Dataset.list_files(str(data_dir / (folder + '/*')), shuffle=False)
+            imgs = tf.data.Dataset.list_files(str(data_dir / (folder)), shuffle=False)
             datasets.append(imgs.map(
                 lambda x: tf.py_function(func=func, inp=[x]+inputs, Tout=dataset_shape),
                 num_parallel_calls=tf.data.AUTOTUNE))
 
-        ds = datasets[0].concatenate(datasets[1])
-        dataset = ds.concatenate(datasets[2])
+        if(file_type=='png'): 
+            ds = datasets[0].concatenate(datasets[1])
+            dataset = ds.concatenate(datasets[2])
+        elif(file_type=='mat'):
+            dataset = datasets[0]
 
         return dataset
 
@@ -77,11 +80,16 @@ class DataLoader:
     def process_mat(self, file_path,  height=None, width=None):
 
 
-        with h5py.File(file_path.numpy().decode('utf-8'), 'r') as f:
+        """with h5py.File(file_path.numpy().decode('utf-8'), 'r') as f:
             img = np.array(f.get('cjdata/image')).astype(np.float64)
             mask = np.array(f.get('cjdata/tumorMask'))
             label = np.array(f.get('cjdata/label'))
-            f.close()
+            f.close()"""
+        
+        mat = read_mat(file_path.numpy().decode('utf-8'))
+        img = np.array(mat['cjdata']['image'])
+        mask = np.array(mat['cjdata']['tumorMask'])
+        label = np.array(mat['cjdata']['label'])
 
         hi = np.max(img)
         lo = np.min(img)

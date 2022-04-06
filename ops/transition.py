@@ -3,18 +3,6 @@ import tensorflow as tf
 
 from scipy import ndimage
 
-def get_tensor_from_dataset(dataset):
-    """From a tensorflow dataset, return a list of tensor.
-    """
-
-    Xs = []
-    ys = []
-    for x, y in dataset:
-        Xs.append(x)
-        ys.append(y)
-    return np.concatenate(Xs, axis=0), np.concatenate(ys, axis=0)
-
-
 def get_segmented_part(img, mask):
     """From the image conserve only part corresponding to the ROI. The rest will be set to 0.
     """
