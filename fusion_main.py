@@ -3,14 +3,16 @@ import numpy as np
 from data_loader.loader import DataLoader
 from models.unet import UNet
 from models.vgg import VGG
-from ops.transition import get_segmented_part, extract_roi_from_img
+from ops.transition import get_segmented_part, extract_roi_from_img, roi_mask_augmentation
 from utils import  get_tensor_from_2D_dataset, get_tensor_from_3D_dataset
 
 
 if __name__=="__main__":
-    batch_sizes = [8, 8]
-    epochs = [8, 8]
-    end_to_end = True
+    batch_sizes = [4, 4]
+    epochs = [1, 1]
+    end_to_end = False
+    roi_augmentation = True
+    data_augmentation = True
 
     # Loading data
     print("Loading data\n\n")
@@ -27,6 +29,8 @@ if __name__=="__main__":
     img_train, mask_train, label_train = get_tensor_from_3D_dataset(train_dataset)
     img_valid, mask_valid, label_valid = get_tensor_from_3D_dataset(valid_dataset)
 
+    img_train, mask_train, label_train = img_train[0:100], mask_train[0:100], label_train[0:100]
+    img_valid, mask_valid, label_valid =img_valid[0:10], mask_valid[0:10], label_valid[0:10]
     # Categorized mask
     mask_train = tf.keras.utils.to_categorical(mask_train, 2)
     mask_valid = tf.keras.utils.to_categorical(mask_valid, 2)
@@ -57,14 +61,23 @@ if __name__=="__main__":
 
 
     # Processing Pre Classification
-    print(("\n\nBegin process train data \n\n"))
 
+    # Build tensorflow dataset to process.
     ds_train = tf.data.Dataset.from_tensor_slices((img_train, mask_train, label_train))
+    ds_valid = tf.data.Dataset.from_tensor_slices((img_valid, mask_valid_pred, label_valid))
+
+    # ROI augmentation
+    if roi_augmentation:
+        print("\n\n ROI Augmentation \n\n")
+        ds_train = ds_train.map(lambda img, mask, label: (img, tf.map_fn(roi_mask_augmentation, mask, dtype=tf.float32), label))
+        ds_valid = ds_valid.map(lambda img, mask, label: (img, tf.map_fn(roi_mask_augmentation, mask, dtype=tf.float32), label))
+
+
+    print(("\n\nBegin process train data \n\n"))
     ds_train = ds_train.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
     ds_train = ds_train.map(lambda img, label: (extract_roi_from_img(img, 0, 224, 224), label))
 
     print(("\n\nBegin process valid data \n\n"))
-    ds_valid = tf.data.Dataset.from_tensor_slices((X_valid, mask_valid_pred, label_valid))
     ds_valid = ds_valid.map(lambda img, mask, label: (get_segmented_part(tf.cast(img, tf.float32), mask), label))
     ds_valid = ds_valid.map(lambda img, label: (extract_roi_from_img(img, 0, 224, 224), label))
 
@@ -72,12 +85,11 @@ if __name__=="__main__":
     ds_train = dl.configure_for_performance(ds_train, shuffle=True)
     ds_valid = dl.configure_for_performance(ds_valid, shuffle=True)
 
-    crop_img_train, label_train = get_tensor_from_dataset(ds_train)
-    crop_img_valid, label_valid = get_tensor_from_dataset(ds_valid)
+    crop_img_train, label_train = get_tensor_from_2D_dataset(ds_train)
+    crop_img_valid, label_valid = get_tensor_from_2D_dataset(ds_valid)
 
     # Classification
     print("Begin classification\n\n")
-
     model = VGG((224, 224, 3))
     opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
     vgg = model.build_graph()

@@ -11,19 +11,36 @@ def get_segmented_part(img, mask):
 
     return tf.math.multiply(img, boolean_mask)
 
-
+@tf.function
 def roi_mask_augmentation(mask, h=40, w=40, center=None, radius=None):
-    
+  
     if center is None: # use the middle of the image
         center = (int(w/2), int(h/2))
     if radius is None: # use the smallest distance between the center and image walls
         radius = min(center[0], center[1], w-center[0], h-center[1])
 
-    Y, X = np.ogrid[:h, :w]
-    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+    X = tf.cast([], tf.int32)
+    Y = tf.cast([], tf.int32)
+    for i in range(w):
+      X = tf.concat([X, tf.cast([i], tf.int32)], 0)
+    for i in range(h):
+      Y = tf.concat([Y, tf.cast([i], tf.int32)], 0)
+    
+    Y = tf.reshape(Y, (h, 1))
+    X = tf.reshape(X, (1, w))
+    
+    dist_from_center = tf.math.sqrt(tf.cast((X - center[0])**2 + (Y-center[1])**2, tf.float32))
 
-    circular_mask = dist_from_center <= radius
-    return ndimage.binary_dilation(mask, circular_mask)
+    circular_mask = tf.math.greater_equal(tf.cast(radius, tf.float32), dist_from_center)
+    mask_shape = tf.shape(mask)
+    mask = tf.reshape(mask, [1, mask_shape[0], mask_shape[1], 1])
+    result = tf.nn.dilation2d(
+                              input=tf.cast(mask, tf.float32), filters=tf.expand_dims(tf.cast(circular_mask, tf.float32), axis=-1),
+                              strides=(1,1,1,1), padding="SAME", data_format="NHWC", dilations=(1,1,1,1)
+                              )
+    
+    return  tf.squeeze(result - tf.cast(1, tf.float32), axis=[-1, 0])
+
 
 
 def extract_roi_from_img(image, tol=0, height=None, width=None):
