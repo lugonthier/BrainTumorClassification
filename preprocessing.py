@@ -3,6 +3,10 @@ import importlib
 
 
 if __name__=="__main__":
+    # PARAMS
+    augment_train = True
+
+
     mat_data = load_data('mat')
     classified_data = classify_data(mat_data)
     print(len(classified_data[0])) # 708
@@ -16,11 +20,17 @@ if __name__=="__main__":
     dataSeparator = DataSeparator(classified_data, equalizing_transformations)
 
     # Splitting
-    dataSeparator.separate_data()
+    dataSeparator.separate_data(save=False)
+    # Save original train.
+    dataSeparator.save_train_to_file_system('train_original')
+
     dataSeparator.equalize_train()
 
+    dataSeparator.save_train_to_file_system('train_equalize')
+
     # Augmentation
-    dataSeparator.augment_train(Transformation(gaussian_blur))
-    dataSeparator.augment_train(Transformation(rotate_90))
+    if augment_train:
+        dataSeparator.augment_train(Transformation(gaussian_blur))
+        #dataSeparator.augment_train(Transformation(rotate_90))
 
     dataSeparator.save_to_file_system()

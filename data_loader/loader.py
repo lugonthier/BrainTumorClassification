@@ -37,7 +37,8 @@ class DataLoader:
             func = self.process_png
 
         elif file_type == 'mat':
-            folders = ['*']
+            folder = '*'
+            #folders = [str(data_dir)+'/'+str(file)+'.mat' for file in range(1,3060) ]
 
             dataset_shape = [tf.float32, tf.float32, tf.int32]
             func = self.process_mat
@@ -46,11 +47,12 @@ class DataLoader:
             raise Exception
 
         datasets = []
-        for folder in folders:
-            imgs = tf.data.Dataset.list_files(str(data_dir / (folder)), shuffle=False)
-            datasets.append(imgs.map(
-                lambda x: tf.py_function(func=func, inp=[x]+inputs, Tout=dataset_shape),
-                num_parallel_calls=tf.data.AUTOTUNE))
+        
+        #imgs = tf.data.Dataset.from_tensor_slices(folders)
+        imgs = tf.data.Dataset.list_files(str(data_dir / (folder)), shuffle=False)
+        datasets.append(imgs.map(
+            lambda x: tf.py_function(func=func, inp=[x]+inputs, Tout=dataset_shape),
+            num_parallel_calls=tf.data.AUTOTUNE))
 
         if(file_type=='png'): 
             ds = datasets[0].concatenate(datasets[1])

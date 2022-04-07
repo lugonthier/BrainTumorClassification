@@ -43,9 +43,7 @@ class VGG(tf.keras.Model):
         # FC
         self.flatten = Flatten()
         self.dense1 = Dense(units=4096, activation="relu")
-        self.dropout1 = Dropout(0.5)
         self.dense2 = Dense(units=4096, activation="relu")
-        self.dropout2 = Dropout(0.5)
         self.output_layer = Dense(units=n_classes, activation="softmax")
 
 
@@ -80,12 +78,8 @@ class VGG(tf.keras.Model):
         # FC
         x = self.flatten(x)
         x = self.dense1(x)
-        if training:
-            x = self.dropout1(x)
         x = self.dense2(x)
-        if training:
-            x = self.dropout2(x)
-            
+       
         x = self.output_layer(x)
 
         return x

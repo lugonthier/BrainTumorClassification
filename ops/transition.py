@@ -47,7 +47,6 @@ def extract_roi_from_img(image, tol=0, height=None, width=None):
     """ Extract non zeros part of an image.
     Used to crop an image to get only the region of interest.
     """
-    print(image)
     tol = tf.cast(tol,tf.float32)
     shape = tf.shape(image)
     m, n = shape[0], shape[1]
@@ -96,5 +95,4 @@ def extract_roi_from_img(image, tol=0, height=None, width=None):
     
     if (height is not None) and (width is not None):
         new_image = tf.image.resize(new_image, [height, width])
-    print(new_image)
     return new_image
