@@ -1,28 +1,86 @@
-import tensorflow as tf
+
+
+import os
+import pickle
+import argparse
 import numpy as np
+import pandas as pd
 import seaborn as sns
-from data_loader.loader import DataLoader
-from models.unet import UNet
+import tensorflow as tf
+
 from models.vgg import VGG
-from ops.transition import get_segmented_part, extract_roi_from_img, roi_mask_augmentation
-from utils import  get_tensor_from_2D_dataset, get_tensor_from_3D_dataset
+from models.unet import UNet
+from data_loader.loader import DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
+from utils import  get_tensor_from_2D_dataset, get_tensor_from_3D_dataset
+from ops.transition import get_segmented_part, extract_roi_from_img, roi_mask_augmentation
 
+
+def argument_parser():
+    """
+        A parser to allow user to easily experiment different models along with
+        datasets and differents parameters.
+    """
+    parser = argparse.ArgumentParser(usage='\n python3 main.py  [dataset] [hyper_parameters]',
+                                     description="")
+
+    parser.add_argument('--train_set', type=str, default='train_equalize', choices = ['train_original', 'train_equalize', 'train_augmente'])
+    parser.add_argument('--segmentor_batch_size', type=int, default=2,
+                        help='The size of the training batch for the segmentor')
+    
+    parser.add_argument('--classifier_batch_size', type=int, default=2,
+                        help='The size of the training batch for the classifier')
+    
+    parser.add_argument('--segmentor_epochs', type=int, default=2,
+                        help='Number of epochs for the segmentor')
+    
+    parser.add_argument('--classifier_epochs', type=int, default=2,
+                        help='Number of epochs for the classifier')
+    
+    parser.add_argument('--end_to_end', type=bool, default=False,
+                        help='To perform end to end training.')
+
+    parser.add_argument('--roi_augmentation', type=bool, default=False,
+                        help='To perform roi augmentation')
+
+    parser.add_argument('--predict_test', type=bool, default=True,
+                        help='To perform data augmentation')
+
+    return parser.parse_args()
+    
+    
 
 if __name__=="__main__":
-    batch_sizes = [2, 2]
-    epochs = [10, 10]
-    end_to_end = False
-    roi_augmentation = True
-    data_augmentation = False
-    train = True
-    predict_test = True
+    args = argument_parser()
+
+    batch_sizes = [args.segmentor_batch_size, args.classifier_batch_size]
+    epochs = [args.segmentor_epochs  , args.classifier_epochs]
+    end_to_end = args.end_to_end
+    roi_augmentation = args.roi_augmentation
+    train_set = args.train_set
+    predict_test = args.predict_test
+
+    experimentation_name = f'experiment__{train_set}_batch_sizes=({batch_sizes[0]},{batch_sizes[1]})_epochs=({epochs[0]},{epochs[1]})'
+    if end_to_end:
+        experimentation_name += '_end_to_end'
+    
+    if roi_augmentation:
+      experimentation_name += '_roi_augmentation'
+    
+    if not os.path.exists('results'):
+        os.makedirs('results')
+    
+    path = f'results/{experimentation_name}'
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
     # Loading data
     print("Loading data...\n")
 
     dl = DataLoader()
-    train_dataset = dl.load_data("/content/dataset/train_equalize/", "mat", height=160, width=160)
+    train_dataset = dl.load_data(f"/content/dataset/{train_set}/", "mat", height=160, width=160)
     valid_dataset = dl.load_data("/content/dataset/Validation/", "mat", height=160, width=160)
    
     train_dataset = dl.configure_for_performance(train_dataset, shuffle=True)
@@ -33,7 +91,7 @@ if __name__=="__main__":
     img_valid, mask_valid, label_valid = get_tensor_from_3D_dataset(valid_dataset)
 
     # Categorized masks.
-    ind_train =len(mask_train)
+    ind_train = len(mask_train)
     mask = np.concatenate([mask_train, mask_valid])
     mask = tf.keras.utils.to_categorical(mask, 2)
     mask_train = mask[:ind_train]
@@ -44,19 +102,22 @@ if __name__=="__main__":
 
     # Segmentation Training
     print('\n' + ('-'*10) + 'Begin segmentation'+ ('-'*10) + '\n')
-    model = UNet((160, 160, 3), 2)
+    segmentor = UNet((160, 160, 3), 2)
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
-    model.compile(optimizer=opt, loss="binary_crossentropy", metrics=[tf.keras.metrics.MeanIoU(num_classes=2)])
-    model.fit(img_train, mask_train, epochs=epochs[0], batch_size=batch_sizes[0], validation_data=(img_valid, mask_valid))
+    segmentor.compile(optimizer=opt, loss="binary_crossentropy", metrics=[tf.keras.metrics.MeanIoU(num_classes=2)])
+    segmentor_history = segmentor.fit(img_train, mask_train, epochs=epochs[0], batch_size=batch_sizes[0], validation_data=(img_valid, mask_valid))
+    print(segmentor_history.history.keys())
+    segmentor_result = pd.DataFrame(segmentor_history.history)
+    segmentor_result.to_csv(f'results/{experimentation_name}/segmentor.csv')
 
     # Segmentation Prediction(s)
     if end_to_end:
       print("\nBegin segmentation prediction on training set\n")
-      mask_train = tf.expand_dims(tf.math.argmax(model.predict(img_train), axis=-1), axis=-1)
+      mask_train = tf.expand_dims(tf.math.argmax(segmentor.predict(img_train), axis=-1), axis=-1)
     else:
       mask_train = tf.expand_dims(tf.math.argmax(mask_train, axis=-1), axis=-1)
     print("\nSegmentation prediction on validation set\n")
-    mask_valid_pred = tf.expand_dims(tf.math.argmax(model.predict(img_valid), axis=-1), axis=-1)
+    mask_valid_pred = tf.expand_dims(tf.math.argmax(segmentor.predict(img_valid), axis=-1), axis=-1)
    
     
     # Processing Pre Classification
@@ -92,7 +153,11 @@ if __name__=="__main__":
     vgg = vgg.build_graph()
     
     vgg.compile(optimizer=opt, loss=tf.keras.losses.categorical_crossentropy, metrics=['accuracy'])
-    vgg.fit(crop_img_train, label_train, validation_data=(crop_img_valid, label_valid), batch_size=batch_sizes[1], epochs=epochs[1], verbose=1)
+    vgg_history = vgg.fit(crop_img_train, label_train, validation_data=(crop_img_valid, label_valid), batch_size=batch_sizes[1], epochs=epochs[1], verbose=1)
+
+    print(vgg_history.history.keys())
+    vgg_result = pd.DataFrame(vgg_history.history)
+    vgg_result.to_csv(f'results/{experimentation_name}/vgg.csv')
 
     if predict_test:
 
@@ -104,7 +169,7 @@ if __name__=="__main__":
         img_test, mask_test, label_test = get_tensor_from_3D_dataset(test_dataset)
         
         # Segmentation prediction
-        mask_pred = tf.expand_dims(tf.math.argmax(model.predict(img_test), axis=-1), axis=-1)
+        mask_pred = tf.expand_dims(tf.math.argmax(segmentor.predict(img_test), axis=-1), axis=-1)
 
         ds_test = tf.data.Dataset.from_tensor_slices((img_test, mask_pred, label_test))
         
@@ -128,6 +193,7 @@ if __name__=="__main__":
         conf = confusion_matrix(label_test, label_pred)
         print(conf)
         sns.heatmap(conf, annot=True)
+        
 
 
 
