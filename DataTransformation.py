@@ -16,7 +16,7 @@ def load_data(type, nb_images=3064):
     data =  {}
     if type == 'mat':
         for i in range(nb_images):
-            dir = "dataset/Mat_Format_Dataset/" + str(i+1) + ".mat"
+            dir = "BrainTumorDataset/Mat_Format_Dataset/" + str(i+1) + ".mat"
             data[str(i+1)] = read_mat(dir)
         return data
     
@@ -314,7 +314,7 @@ def random_sampling(mat_data, n):
         del mat_data[random_key]
     return sampling
 
-def separate_train_test_val(mat_data, p_train=0.8, p_test=0.1, p_val=0.1, save=False):
+def separate_train_test_val(mat_data, p_train=0.7, p_test=0.15, p_val=0.15, save=False):
     """
     input:
         - mat_data : liste de donnees a separer [ {}, {}, {} ]
@@ -376,9 +376,10 @@ def separate_train_test_val(mat_data, p_train=0.8, p_test=0.1, p_val=0.1, save=F
         return
     
     if save:
-        # Train must me equally distributed among classes before saving
-        # save_data(mat_train, 'dataset/Train')
+        save_data(mat_train, 'dataset/Train_origin')
+   
         save_data(mat_test, 'dataset/Test')
+
         save_data(mat_val, 'dataset/Validation')
     
     return mat_train, mat_test, mat_val
@@ -490,6 +491,7 @@ class DataSeparator:
         self.mat_val = [{}, {}, {}]
         self.mat_test = [{}, {}, {}]
         self.mat_train = [{}, {}, {}]
+        self.mat_train_origin = [{}, {}, {}]
         self.equalizing_transformations = equalizing_transformations
         self.N = len(mat_data[0]) + len(mat_data[1]) + len(mat_data[2])
         self.p_train = p_train
@@ -508,8 +510,8 @@ class DataSeparator:
             - validation
         """
         # Separation des donnees en train, test et validation
-        self.mat_train, self.mat_test, self.mat_val = separate_train_test_val(self.mat_data, self.p_train, self.p_test, self.p_val, save)
-    
+        self.mat_train, self.mat_test, self.mat_val = separate_train_test_val(self.mat_data, self.p_train, self.p_test, self.p_val, save=save)
+
     def equalize_train(self):
         """
         Augmente les donnees d'entrainement jusqu'a ce que chaque classe soit egalement representee dans le train
@@ -574,20 +576,21 @@ class DataSeparator:
         Sauvegarde les donnees dans le systeme de fichiers
         """
         for c in range(len(self.mat_train)):
+
             print('Sauvegarde des donnees de validation de la classe ' + str(c))
             save_data(self.mat_val[c], 'dataset/Validation')
             print('Sauvegarde des donnees de test de la classe ' + str(c))
             save_data(self.mat_test[c], 'dataset/Test')
-            print('Sauvegarde des donnees d\'entrainement de la classe ' + str(c))
-            save_data(self.mat_train[c], 'dataset/train')
+            print('Sauvegarde des donnees d\'entrainement augmentées de la classe ' + str(c))
+            save_data(self.mat_train[c], 'dataset/train_augmente')
 
-    def save_train_to_file_system(self):
+    def save_train_to_file_system(self, path):
         """
         Sauvegarde les donnees d'entrainement dans le systeme de fichiers
         """
         for c in range(len(self.mat_train)):
             print('Sauvegarde des donnees d\'entrainement de la classe ' + str(c))
-            save_data(self.mat_train[c], 'dataset/Train-non-augmente')
+            save_data(self.mat_train[c], 'dataset/'+ path)
 
 class Transformation:
     def __init__(self, transformation_function, parameters=None, display=False):

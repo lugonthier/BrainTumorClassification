@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Input
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dropout, Dense, Input
 
 
 class VGG(tf.keras.Model):
@@ -49,7 +49,7 @@ class VGG(tf.keras.Model):
 
 
     def call(self, inputs, training=False):
-        #inputs = input(inputs)
+      
         # B1
         x = self.conv1(inputs)
         x = self.conv2(x)
@@ -79,6 +79,7 @@ class VGG(tf.keras.Model):
         x = self.flatten(x)
         x = self.dense1(x)
         x = self.dense2(x)
+       
         x = self.output_layer(x)
 
         return x
