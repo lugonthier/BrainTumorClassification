@@ -34,6 +34,9 @@ Le travail réalisé se situe dans les différents notebooks du projet. Les note
 - ```resultats.ipynb``` : Présente les résultats obtenus avec l'algorithme de classification. Ce notebook traite seulement des matrices de confusion. Les autres résultats se trouvent dans ```model_results```.
 
 ### Algorithme de classification
+- ```models/unet.py``` : Implémentation du UNet.
+- ```models/vgg.py``` :  Implémentation du VGGNet.
+- ```./model_results``` : Résultats obtenus à la suite des expérimentations.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
